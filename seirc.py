@@ -52,7 +52,8 @@ def toplaintext(text):
     .replace('<i>', '\x1F')
     .replace('</i>', '\x1F')
     )
-  text = re.sub(r'<img src="([^"]+)"', r'\1', text)
+  text = re.sub(r'<img [^>]*src="([^"]+)"[^>]*>', r'[img: \1 ]', text)
+  text = re.sub(r'<a [^>]*href="([^"]+)"[^>]*>', r'[link: \1 ]', text)
   text = re.sub(r'<[^>]+>', '', text)
   return _parser.unescape(text)
 
