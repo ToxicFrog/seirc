@@ -6,9 +6,13 @@ import socket
 import chatexchange.client
 import chatexchange.events
 
+from HTMLParser import HTMLParser
+
 STACK_BACKEND = 'stackexchange.com'
 BIND_HOST = 'localhost'
 BIND_PORT = 7825
+
+_parser = HTMLParser()
 
 def irc(regex):
   regex = re.compile(regex)
@@ -48,13 +52,9 @@ def toplaintext(text):
     .replace('<i>', '\x1F')
     .replace('</i>', '\x1F')
     )
-  text = re.sub('<[^>]+>', '', text)
-  text = (text
-    .replace('&amp;', '&')
-    .replace('&lt', '<')
-    .replace('&gt', '>')
-    )
-  return text
+  text = re.sub(r'<img src="([^"]+)"', r'\1', text)
+  text = re.sub(r'<[^>]+>', '', text)
+  return _parser.unescape(text)
 
 class IRCUser(asynchat.async_chat):
   """Represents a single connected user.
@@ -68,11 +68,12 @@ class IRCUser(asynchat.async_chat):
     asynchat.async_chat.__init__(self, sock=sock)
     self.recvq = []
     self.channels = {}
-    self.set_terminator('\n')
+    self.set_terminator('\r\n')
     # IRC user state
     self.username = None
     self.password = None
     self.nick = None
+    self.stack = None
 
   def collect_incoming_data(self, data):
     self.recvq.append(data)
@@ -105,9 +106,10 @@ class IRCUser(asynchat.async_chat):
 
   def to_irc(self, fmt, *args):
     print "irc>>", (fmt % tuple(args))
-    self.push(fmt % tuple(args) + '\n')
+    self.push((fmt % tuple(args) + '\r\n').encode('utf-8'))
 
   def login(self):
+    print 'Logging in to StackExchange as', self.username
     try:
       self.stack = chatexchange.Client(STACK_BACKEND)
       self.stack.login(self.username, self.password)
@@ -115,12 +117,14 @@ class IRCUser(asynchat.async_chat):
       self.to_irc(':SEIRC 376 %s :End of MOTD', self.nick)
     except Exception as e:
       print 'ERROR:', e
-      self.to_irc(':SEIRC 464 %s :Login to StackExchange failed')
+      self.stack = None
+      self.to_irc(':SEIRC 464 %s :Login to StackExchange failed: %s', self.nick, e)
+      self.to_irc(':%s QUIT', self.nick)
       self.close_when_done()
 
   @irc(r'PING (.*)')
-  def irc_print(self, ts):
-    self.to_irc('PONG %s', ts)
+  def irc_ping(self, ts):
+    self.to_irc(':SEIRC PONG SEIRC :%s', ts)
 
   @irc(r'NICK (.*)')
   def irc_nick(self, nick):
@@ -152,13 +156,29 @@ class IRCUser(asynchat.async_chat):
       self.channels[channel.irc_name] = channel
       channel.watch(lambda msg,stack: self._handle_stack(msg))
       self.to_irc(':%s JOIN %s', self.nick, channel.irc_name)
-      # Send user list for channel.
-      self.to_irc(':SEIRC 353 %s = %s :%s', self.nick, channel.name,
-          ' '.join([user.replace(' ', '') for user in channel.get_current_user_names()]))
-      self.to_irc(':SEIRC 366 %s %s :end of NAMES', self.nick, channel.name)
+      self._send_names(channel)
+      self._send_modes(channel)
     except Exception as e:
       print 'ERROR:', e
       self.to_irc(':SEIRC 403 %s :No channel with that ID.', chanid)
+
+  def _send_modes(self, channel):
+    self.to_irc(':SEIRC 324 %s %s +ntr', self.nick, channel.irc_name)
+
+  def _send_names(self, channel):
+    self.to_irc(':SEIRC 353 %s = %s :%s', self.nick, channel.irc_name,
+        ' '.join([tonick(user) for user in channel.get_current_user_names()]))
+    self.to_irc(':SEIRC 366 %s %s :end of NAMES', self.nick, channel.irc_name)
+
+  @irc(r'NAMES (\S+)')
+  def irc_names(self, channel):
+    if channel in self.channels:
+      self._send_names(self.channels[channel])
+
+  @irc(r'MODE (\S+)')
+  def irc_mode(self, channel):
+    if channel in self.channels:
+      self._send_modes(self.channels[channel])
 
   @irc(r'PART (\S+)')
   def irc_part(self, channel):
@@ -190,15 +210,20 @@ class IRCUser(asynchat.async_chat):
       if msg.user == self.stack.get_me():
         # Ignore self-messages
         return
-      self.to_irc('%s PRIVMSG %s :%s',
+      self.to_irc(':%s PRIVMSG %s :%s',
         tonick(msg.user.name),
         tochannel(msg.room.name),
         toplaintext(msg.content))
+    elif isinstance(msg, chatexchange.events.MessageEdited):
+      self.to_irc(':%s PRIVMSG %s :%s',
+        tonick(msg.user.name),
+        tochannel(msg.room.name),
+        '*' + toplaintext(msg.content))
     elif isinstance(msg, chatexchange.events.UserEntered):
-      self.to_irc('%s JOIN :%s', tonick(msg.user.name),
+      self.to_irc(':%s JOIN %s', tonick(msg.user.name),
         tochannel(msg.room.name))
     elif isinstance(msg, chatexchange.events.UserLeft):
-      self.to_irc('%s PART :%s', tonick(msg.user.name),
+      self.to_irc(':%s PART %s', tonick(msg.user.name),
         tochannel(msg.room.name))
     else:
       print 'Unknown message type from slack:', msg
@@ -224,4 +249,6 @@ class IRCServer(asyncore.dispatcher):
         self.close()
 
 listener = IRCServer(address=(BIND_HOST, BIND_PORT))
+print "Listening on", BIND_PORT
 asyncore.loop()
+listener.close()
