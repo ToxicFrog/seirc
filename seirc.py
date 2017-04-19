@@ -52,8 +52,16 @@ def toplaintext(text):
     .replace('<i>', '\x1F')
     .replace('</i>', '\x1F')
     )
-  text = re.sub(r'<img [^>]*src="([^"]+)"[^>]*>', r'[img: \1 ]', text)
-  text = re.sub(r'<a [^>]*href="([^"]+)"[^>]*>', r'[link: \1 ]', text)
+  def fix_link(match):
+    link = match.group(1)
+    if link.startswith('//'):
+      return ' [http:' + link + '] '
+    if link.startswith('/'):
+      return ' [http://' + STACK_BACKEND + link + '] '
+    return ' [' + link + '] '
+
+  text = re.sub(r'\s*<img [^>]*src="([^"]+)"[^>]*>\s*', r' [img \1] ', text)
+  text = re.sub(r'\s*<a [^>]*href="([^"]+)"[^>]*>\s*', fix_link, text)
   text = re.sub(r'<[^>]+>', '', text)
   return _parser.unescape(text)
 
