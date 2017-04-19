@@ -219,10 +219,11 @@ class IRCUser(asynchat.async_chat):
       if msg.user == self.stack.get_me():
         # Ignore self-messages
         return
-      self.to_irc(':%s PRIVMSG %s :%s',
-        tonick(msg.user.name),
-        tochannel(msg.room.name),
-        toplaintext(msg.content))
+      for line in msg.content.split('\n'):
+          self.to_irc(':%s PRIVMSG %s :%s',
+            tonick(msg.user.name),
+            tochannel(msg.room.name),
+            toplaintext(line))
     elif isinstance(msg, chatexchange.events.MessageEdited):
       self.to_irc(':%s PRIVMSG %s :%s',
         tonick(msg.user.name),
