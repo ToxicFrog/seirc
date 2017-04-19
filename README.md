@@ -78,3 +78,9 @@ name.
 For example, to join Sandbox, you'd see that the URL is
 `http://chat.stackexchange.com/rooms/1/sandbox`, type `/join 1` in IRC, and
 find yourself in `#sandbox` on IRC a moment later.
+
+## TODO
+
+- Edits should show only the diff, not the entire line
+- /me should translate into `*foo*` or something
+- `*` and `_` render as italic in SE, but not in IRC
