@@ -260,5 +260,7 @@ class IRCServer(asyncore.dispatcher):
 
 listener = IRCServer(address=(BIND_HOST, BIND_PORT))
 print "Listening on", BIND_PORT
-asyncore.loop()
-listener.close()
+try:
+  asyncore.loop()
+finally:
+  listener.close()
