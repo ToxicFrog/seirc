@@ -107,8 +107,10 @@ class IRCUser(asynchat.async_chat):
     self.close()
 
   def handle_error(self):
-    if self.stack:
+    try:
       self.stack.logout()
+    except e:
+      pass
     self.to_irc(':%s QUIT :Connection to Stack lost', self.nick)
     self.close_when_done()
     return asynchat.async_chat.handle_error(self)
@@ -210,6 +212,15 @@ class IRCUser(asynchat.async_chat):
     if not target in self.channels:
       self.to_irc(':SEIRC 404 %s :You are not on that channel', self.nick)
       return
+    # If the message starts with a run of non-whitespace followed by :,
+    # assume it's being directed at another user and replace the trailing :
+    # with a leading @ so that the stack webclient's hilight gets triggered.
+    msg = re.sub(r'(\S+): ', r'@\1 ', msg)
+
+    # If the message is a CTCP ACTION, wrap it in * instead.
+    msg = re.sub('^\x01ACTION (.*)\x01$', r'*\1*', msg)
+
+    # Send it to Stack.
     self.channels[target].send_message(msg)
 
   def _handle_stack(self, msg):
@@ -220,10 +231,12 @@ class IRCUser(asynchat.async_chat):
         # Ignore self-messages
         return
       for line in msg.content.split('\n'):
-          self.to_irc(':%s PRIVMSG %s :%s',
-            tonick(msg.user.name),
-            tochannel(msg.room.name),
-            toplaintext(line))
+        if line.startswith('*') and line.endswith('*'):
+          line = '\x01ACTION' + line[1:-1] + '\x01'
+        self.to_irc(':%s PRIVMSG %s :%s',
+          tonick(msg.user.name),
+          tochannel(msg.room.name),
+          toplaintext(line))
     elif isinstance(msg, chatexchange.events.MessageEdited):
       self.to_irc(':%s PRIVMSG %s :%s',
         tonick(msg.user.name),
@@ -263,4 +276,5 @@ print "Listening on", BIND_PORT
 try:
   asyncore.loop()
 finally:
+  print "Closing listener"
   listener.close()

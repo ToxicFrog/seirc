@@ -79,8 +79,18 @@ For example, to join Sandbox, you'd see that the URL is
 `http://chat.stackexchange.com/rooms/1/sandbox`, type `/join 1` in IRC, and
 find yourself in `#sandbox` on IRC a moment later.
 
+### Chatting
+
+- *Stack names* are translated into IRC-style nicks without whitespace.
+- *Edits* show up as the edited line, repeated, with a `*` in front
+- *@ hilights* work properly. Starting a line with `Name: ` (as is common with
+  tab completion in most IRC clients) will automatically be translated to
+  `@Name `.
+- *Links and inline images* are displayed wrapped in [].
+- *Multi-line messages* show up as multiple IRC messages.
+
 ## TODO
 
 - Edits should show only the diff, not the entire line
-- /me should translate into `*foo*` or something
 - `*` and `_` render as italic in SE, but not in IRC
+- Channel topic
