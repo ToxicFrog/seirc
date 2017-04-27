@@ -36,7 +36,7 @@ def log(s):
 
 # Convert a Stack user name into an IRC nick
 def tonick(user_name):
-  return user_name.replace(' ', '')
+  return user_name.replace(' ', '').encode('ascii', 'ignore')
 
 # Convert a Stack room name into an IRC channel name
 def tochannel(room_name):
