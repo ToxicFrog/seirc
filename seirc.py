@@ -36,7 +36,7 @@ def log(s):
 
 # Convert a Stack user name into an IRC nick
 def tonick(user_name):
-  return user_name.replace(' ', '').encode('ascii', 'ignore')
+  return user_name.replace(' ', '') #.encode('ascii', 'ignore')
 
 # Convert a Stack room name into an IRC channel name
 def tochannel(room_name):
@@ -180,7 +180,7 @@ class IRCUser(asynchat.async_chat):
 
   def _send_names(self, channel):
     self.to_irc(':SEIRC 353 %s = %s :%s', self.nick, channel.irc_name,
-        ' '.join([tonick(user) for user in channel.get_current_user_names()]))
+        ' '.join([tonick(user.name) for user in channel.get_current_users()]))
     self.to_irc(':SEIRC 366 %s %s :end of NAMES', self.nick, channel.irc_name)
 
   @irc(r'NAMES (\S+)')
