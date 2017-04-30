@@ -133,6 +133,8 @@ class IRCUser(asynchat.async_chat):
       self.to_irc(':%s QUIT', self.nick)
       self.close_when_done()
 
+  #### Handlers for messages coming from IRC ####
+
   @irc(r'PING (.*)')
   def irc_ping(self, ts):
     self.to_irc(':SEIRC PONG SEIRC :%s', ts)
@@ -223,10 +225,13 @@ class IRCUser(asynchat.async_chat):
     # Send it to Stack.
     self.channels[target].send_message(msg)
 
+  #### Handlers for messages from Stack ####
+
   def _handle_stack(self, msg):
     print "<<stack", msg
-    if (isinstance(msg, chatexchange.events.MessagePosted)
-        or isinstance(msg, chatexchange.events.UserMentioned)):
+    if isinstance(msg, chatexchange.events.MessagePosted):
+      # Note: we omit UserMentioned here because UserMentioned events are always
+      # accompanied with a MessagePosted event with the same payload.
       if msg.user == self.stack.get_me():
         # Ignore self-messages
         return
