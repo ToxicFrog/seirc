@@ -109,7 +109,7 @@ class IRCUser(asynchat.async_chat):
   def handle_error(self):
     try:
       self.stack.logout()
-    except e:
+    except:
       pass
     self.to_irc(':%s QUIT :Connection to Stack lost', self.nick)
     self.close_when_done()
