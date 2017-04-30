@@ -219,6 +219,9 @@ class IRCUser(asynchat.async_chat):
     # with a leading @ so that the stack webclient's hilight gets triggered.
     msg = re.sub(r'(\S+): ', r'@\1 ', msg)
 
+    # Translate IRC formatting characters to Slack ones.
+    msg = msg.replace('\x02', '*').replace('\x1F', '_')
+
     # If the message is a CTCP ACTION, wrap it in * instead.
     msg = re.sub('^\x01ACTION (.*)\x01$', r'*\1*', msg)
 
