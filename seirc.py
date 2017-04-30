@@ -52,8 +52,19 @@ def toplaintext(text):
     .replace('<i>', '\x1F')
     .replace('</i>', '\x1F')
     )
+
+  # If we see the same link multiple times in a message, we only convert the
+  # first one for brevity's sake.
+  seen_links = set()
+
+  def fix_img(match):
+    return fix_link(match).replace('[', '[img ', 1)
+
   def fix_link(match):
     link = match.group(1)
+    if link in seen_links:
+      return ''
+    seen_links.add(link)
     if link.startswith('//'):
       return ' [http:' + link + '] '
     if link.startswith('/'):
@@ -238,13 +249,13 @@ class IRCUser(asynchat.async_chat):
       if msg.user == self.stack.get_me():
         # Ignore self-messages
         return
-      for line in msg.content.split('\n'):
+      for line in toplaintext(msg.content).split('\n'):
         if line.startswith('*') and line.endswith('*'):
           line = '\x01ACTION' + line[1:-1] + '\x01'
         self.to_irc(':%s PRIVMSG %s :%s',
           tonick(msg.user.name),
           tochannel(msg.room.name),
-          toplaintext(line))
+          line)
     elif isinstance(msg, chatexchange.events.MessageEdited):
       self.to_irc(':%s PRIVMSG %s :%s',
         tonick(msg.user.name),
