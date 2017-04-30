@@ -71,9 +71,9 @@ def toplaintext(text):
       return ' [http://' + STACK_BACKEND + link + '] '
     return ' [' + link + '] '
 
-  text = re.sub(r'\s*<img [^>]*src="([^"]+)"[^>]*>\s*', r' [img \1] ', text)
+  text = re.sub(r'\s*<img [^>]*src="([^"]+)"[^>]*>\s*', fix_img, text)
   text = re.sub(r'\s*<a [^>]*href="([^"]+)"[^>]*>\s*', fix_link, text)
-  text = re.sub(r'<[^>]+>', '', text)
+  text = re.sub(r'(<[^>]+>)+', ' ', text)
   return _parser.unescape(text)
 
 class IRCUser(asynchat.async_chat):
