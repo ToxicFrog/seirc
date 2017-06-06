@@ -246,33 +246,66 @@ class IRCUser(asynchat.async_chat):
   #### Handlers for messages from Stack ####
 
   def _handle_stack(self, msg):
-    print "<<stack", msg
-    if isinstance(msg, chatexchange.events.MessagePosted):
-      # Note: we omit UserMentioned here because UserMentioned events are always
-      # accompanied with a MessagePosted event with the same payload.
-      if msg.user == self.stack.get_me():
-        # Ignore self-messages
-        return
-      for line in toplaintext(msg.content).split('\n'):
-        if line.startswith('*') and line.endswith('*'):
-          line = '\x01ACTION' + line[1:-1] + '\x01'
-        self.to_irc(':%s PRIVMSG %s :%s',
-          tonick(msg.user.name),
-          tochannel(msg.room.name),
-          line)
-    elif isinstance(msg, chatexchange.events.MessageEdited):
+    if msg.id in self._msg_cache:
+      print('<<stack [duplicate message id:%d dropped]' % msg.id)
+      return
+    print('<<stack', msg)
+    try:
+      msgtype = msg.__class__.__name__.lower()
+      handler = getattr(self, 'stack_' + msgtype, None)
+      if handler:
+        handler(msg)
+      else:
+        print('Unrecognized message type from Stack: %s' % msgtype)
+    except Exception as e:
+      print('!! Error handling message from Stack: %s' % str(e))
+
+  def stack_usermentioned(self, msg):
+    # Skip UserMentioned because UserMentioned events are always
+    # accompanied with a MessagePosted event with the same payload.
+    pass
+
+  def stack_messageposted(self, msg):
+    if msg.user == self.stack.get_me():
+      # Ignore self-messages
+      return
+    for line in toplaintext(msg.content).split('\n'):
+      line = line.strip()
+      if (line.startswith('*') and line.endswith('*')
+          or line.startswith('\x1F') and line.endswith('\x1F')):
+        line = '\x01ACTION' + line[1:-1] + '\x01'
       self.to_irc(':%s PRIVMSG %s :%s',
         tonick(msg.user.name),
         tochannel(msg.room.name),
-        '*' + toplaintext(msg.content))
-    elif isinstance(msg, chatexchange.events.UserEntered):
-      self.to_irc(':%s JOIN %s', tonick(msg.user.name),
-        tochannel(msg.room.name))
-    elif isinstance(msg, chatexchange.events.UserLeft):
-      self.to_irc(':%s PART %s', tonick(msg.user.name),
-        tochannel(msg.room.name))
-    else:
-      print 'Unknown message type from slack:', msg
+        line)
+
+  def stack_messageedited(self, msg):
+    # Note: MessageEdited comes with msg.content as the new content, and
+    # the same message_id as the message being edited.
+    # What we probably want to do here is keep an LRU of seen message IDs --
+    # perhaps 32 or so -- with their associated content, and when we get
+    # a MessageEdited, pull the previous version, compute the diff, show
+    # only the diff, and store the edited version.
+    # This would also let us drop repeat messages, which happen sometimes.
+    # Note: "id" is the ID of the message itself and is guaranteed unique
+    # (or rather, multiple messages with the same ID are guaranteed to be the
+    # same message). "message_id" is the ID of the message being edited.
+    # MessagePosted comes with separate message_id and message fields too
+    # also, sometimes there's a MessageEdited with no corresponding MessagePosted
+    self.to_irc(':%s PRIVMSG %s :%s',
+      tonick(msg.user.name),
+      tochannel(msg.room.name),
+      '*' + toplaintext(msg.content))
+
+  def stack_userentered(self, msg):
+    if msg.user == self.stack.get_me():
+      return
+    self.to_irc(':%s JOIN %s', tonick(msg.user.name),
+      tochannel(msg.room.name))
+
+  def stack_userleft(self, msg):
+    self.to_irc(':%s PART %s', tonick(msg.user.name),
+      tochannel(msg.room.name))
 
 
 class IRCServer(asyncore.dispatcher):

@@ -93,4 +93,6 @@ find yourself in `#sandbox` on IRC a moment later.
 
 - Edits should show only the diff, not the entire line
 - `*` and `_` render as italic in SE, but not in IRC
+- IRC formatting characters sometimes don't get passed to SE properly
 - Channel topic
+- Replies should include the timestamp of the message being replied to, if it's still in the cache
