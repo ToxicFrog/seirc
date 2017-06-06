@@ -1,3 +1,7 @@
+# pylint: disable-all
+
+from __future__ import print_function
+
 import asynchat
 import asyncore
 import re
@@ -6,7 +10,7 @@ import socket
 import chatexchange.client
 import chatexchange.events
 
-from HTMLParser import HTMLParser
+from html.parser import HTMLParser
 
 STACK_BACKEND = 'stackexchange.com'
 BIND_HOST = 'localhost'
@@ -32,11 +36,12 @@ def irc(regex):
 
 
 def log(s):
-  print s
+  print(s)
 
 # Convert a Stack user name into an IRC nick
 def tonick(user_name):
-  return user_name.replace(' ', '') #.encode('ascii', 'ignore')
+  return user_name.encode('utf8').decode('raw_unicode_escape').replace(' ', '')
+  #.encode('ascii', 'ignore')
 
 # Convert a Stack room name into an IRC channel name
 def tochannel(room_name):
@@ -88,7 +93,7 @@ class IRCUser(asynchat.async_chat):
     asynchat.async_chat.__init__(self, sock=sock)
     self.recvq = []
     self.channels = {}
-    self.set_terminator('\r\n')
+    self.set_terminator(b'\r\n')
     # IRC user state
     self.username = None
     self.password = None
@@ -96,21 +101,21 @@ class IRCUser(asynchat.async_chat):
     self.stack = None
 
   def collect_incoming_data(self, data):
-    self.recvq.append(data)
+    self.recvq.append(data.decode('utf8', 'replace'))
 
   def found_terminator(self):
     """Called when we've read an entire line from IRC."""
     msg = ''.join(self.recvq)
-    print '<<irc', msg
+    print('<<irc', msg)
     self.recvq = []
     command = msg.split(None, 1)[0]
     handler = getattr(self, 'irc_' + command.lower(), None)
     if handler:
       if not handler(msg):
-        print "Command handler rejected regex for message: %s" % msg
+        print("Command handler rejected regex for message: %s" % msg)
     else:
       # Unrecognized commands from IRC get ignored.
-      print "Unknown command from IRC: %s" % msg
+      print("Unknown command from IRC: %s" % msg)
 
   def handle_close(self):
     if self.stack:
@@ -127,18 +132,18 @@ class IRCUser(asynchat.async_chat):
     return asynchat.async_chat.handle_error(self)
 
   def to_irc(self, fmt, *args):
-    print "irc>>", (fmt % tuple(args))
+    print("irc>>", (fmt % tuple(args)))
     self.push((fmt % tuple(args) + '\r\n').encode('utf-8'))
 
   def login(self):
-    print 'Logging in to StackExchange as', self.username
+    print('Logging in to StackExchange as', self.username)
     try:
       self.stack = chatexchange.Client(STACK_BACKEND)
       self.stack.login(self.username, self.password)
       self.to_irc(':SEIRC 001 %s :Welcome to StackExchange IRC Relay', self.nick)
       self.to_irc(':SEIRC 376 %s :End of MOTD', self.nick)
     except Exception as e:
-      print 'ERROR:', e
+      print('ERROR:', e)
       self.stack = None
       self.to_irc(':SEIRC 464 %s :Login to StackExchange failed: %s', self.nick, e)
       self.to_irc(':%s QUIT', self.nick)
@@ -183,7 +188,7 @@ class IRCUser(asynchat.async_chat):
       self._send_names(channel)
       self._send_modes(channel)
     except Exception as e:
-      print 'ERROR:', e
+      print('ERROR:', e)
       self.to_irc(':SEIRC 403 %s :No channel with that ID.', chanid)
 
   def _send_modes(self, channel):
@@ -216,8 +221,7 @@ class IRCUser(asynchat.async_chat):
 
   @irc(r'QUIT ?(.*)')
   def irc_quit(self, reason):
-    print "Disconnecting."
-    self.stack.logout()
+    print("Disconnecting.")
     self.close_when_done()
 
   @irc(r'PRIVMSG (.*) :(.*)')
@@ -285,15 +289,20 @@ class IRCServer(asyncore.dispatcher):
     def handle_accept(self):
         # Called when a client connects to our socket
         client_info = self.accept()
+        print("New connection from %s" % str(client_info))
         IRCUser(sock=client_info[0])
 
     def handle_close(self):
         self.close()
 
+import traceback
+import sys
+def handle_exception(type, ex, tb):
+  traceback.print_exception(type, ex, tb)
+  print("Unhandled exception at top level, aborting.")
+  sys.exit(1)
+
+sys.excepthook = handle_exception
 listener = IRCServer(address=(BIND_HOST, BIND_PORT))
-print "Listening on", BIND_PORT
-try:
-  asyncore.loop()
-finally:
-  print "Closing listener"
-  listener.close()
+print("Listening on", BIND_PORT)
+asyncore.loop()
