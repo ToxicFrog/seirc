@@ -118,7 +118,7 @@ class IRCUser(asynchat.async_chat):
       print("Unknown command from IRC: %s" % msg)
 
   def handle_close(self):
-    if self.stack:
+    if self.stack and self.stack.logged_in:
       self.stack.logout()
     self.close()
 
