@@ -273,6 +273,8 @@ class IRCUser(asynchat.async_chat):
       return
     for line in toplaintext(msg.content).split('\n'):
       line = line.strip()
+      if line == '':
+        continue
       if (line.startswith('*') and line.endswith('*')
           or line.startswith('\x1F') and line.endswith('\x1F')):
         line = '\x01ACTION' + line[1:-1] + '\x01'
