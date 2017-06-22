@@ -57,6 +57,8 @@ def toplaintext(text):
     .replace('</u>', '\x1F')
     .replace('<i>', '\x1F')
     .replace('</i>', '\x1F')
+    .replace('<code>', '`')
+    .replace('</code>', '`')
     )
 
   # If we see the same link multiple times in a message, we only convert the
