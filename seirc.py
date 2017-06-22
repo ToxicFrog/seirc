@@ -6,6 +6,7 @@ import asynchat
 import asyncore
 import re
 import socket
+import sys
 
 import chatexchange.client
 import chatexchange.events
@@ -121,6 +122,7 @@ class IRCUser(asynchat.async_chat):
     if self.stack and self.stack.logged_in:
       self.stack.logout()
     self.close()
+    sys.exit(0)
 
   def handle_error(self):
     try:
@@ -328,14 +330,6 @@ class IRCServer(asyncore.dispatcher):
     def handle_close(self):
         self.close()
 
-import traceback
-import sys
-def handle_exception(type, ex, tb):
-  traceback.print_exception(type, ex, tb)
-  print("Unhandled exception at top level, aborting.")
-  sys.exit(1)
-
-sys.excepthook = handle_exception
 listener = IRCServer(address=(BIND_HOST, BIND_PORT))
 print("Listening on", BIND_PORT)
 asyncore.loop()
