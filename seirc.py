@@ -236,7 +236,7 @@ class IRCUser(asynchat.async_chat):
     # If the message starts with a run of non-whitespace followed by :,
     # assume it's being directed at another user and replace the trailing :
     # with a leading @ so that the stack webclient's hilight gets triggered.
-    msg = re.sub(r'(\S+): ', r'@\1 ', msg)
+    msg = re.sub(r'^(\S+): ', r'@\1 ', msg)
 
     # Translate IRC formatting characters to Slack ones.
     msg = msg.replace('\x02', '*').replace('\x1F', '_')
