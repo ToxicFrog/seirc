@@ -274,7 +274,7 @@ class IRCUser(asynchat.async_chat):
       # Ignore self-messages
       return
     for line in toplaintext(msg.content).split('\n'):
-      line = line.strip()
+      line = line.strip(" \t\r\n")
       if line == '':
         continue
       if (line.startswith('*') and line.endswith('*')
