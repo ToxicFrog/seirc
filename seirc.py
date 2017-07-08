@@ -206,7 +206,13 @@ class IRCUser(asynchat.async_chat):
 
   @irc(r'JOIN (\S+)')
   def irc_join(self, chanid):
+    if ',' in chanid:
+      for channel in chanid.split(','):
+        self.irc_join("JOIN %s" % channel)
+      return
     if chanid in self.channels:
+      return
+    if chanid.startswith('#'):
       return
     try:
       channel = self.stack.get_room(chanid)
