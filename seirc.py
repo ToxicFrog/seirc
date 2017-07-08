@@ -2,8 +2,11 @@
 
 from __future__ import print_function
 
+print("Starting up...")
+
 import asynchat
 import asyncore
+import os
 import re
 import socket
 import sys
@@ -12,6 +15,7 @@ import chatexchange.client
 import chatexchange.events
 
 from html.parser import HTMLParser
+from lrudict import LRUDict
 
 STACK_BACKEND = 'stackexchange.com'
 BIND_HOST = 'localhost'
@@ -19,6 +23,12 @@ BIND_PORT = 7825
 
 _parser = HTMLParser()
 
+
+#### Utility functions ####
+
+# Decorator to restrict which IRC messages a given handler fires on, and extract
+# arguments from it. TODO: replace this with a basic IRC parser and dispatch based
+# on method name in a manner similar to the Stack dispatcher.
 def irc(regex):
   regex = re.compile(regex)
   def decorator(f):
@@ -83,6 +93,23 @@ def toplaintext(text):
   text = re.sub(r'\s*<a [^>]*href="([^"]+)"[^>]*>\s*', fix_link, text)
   text = re.sub(r'(<[^>]+>)+', ' ', text)
   return _parser.unescape(text)
+
+def diffstr(old, new, context=0):
+  """Return only the part of `new` that is different from `old`, by stripping
+  the common prefix and suffix (if any) from them."""
+  prefix = '…'
+  suffix = '…'
+  prefix_len = max(0, len(os.path.commonprefix([old, new])) - context)
+  suffix_len = -max(0, len(os.path.commonprefix([old[::-1], new[::-1]])) - context)
+  if prefix_len == 0:
+    prefix = ''
+  if suffix_len == 0:
+    suffix_len = None
+    suffix = ''
+  return prefix + new[prefix_len:suffix_len] + suffix
+
+
+#### Server code ####
 
 class IRCUser(asynchat.async_chat):
   """Represents a single connected user.
@@ -249,16 +276,17 @@ class IRCUser(asynchat.async_chat):
 
   #### Handlers for messages from Stack ####
 
+  _msg_cache = LRUDict(lru_size=256)
+
   def _handle_stack(self, msg):
-    if msg.id in self._msg_cache:
-      print('<<stack [duplicate message id:%d dropped]' % msg.id)
-      return
     print('<<stack', msg)
     try:
       msgtype = msg.__class__.__name__.lower()
       handler = getattr(self, 'stack_' + msgtype, None)
       if handler:
         handler(msg)
+        if 'message_id' in msg.data:
+          self._msg_cache[msg.data['message_id']] = msg
       else:
         print('Unrecognized message type from Stack: %s' % msgtype)
     except Exception as e:
@@ -266,7 +294,7 @@ class IRCUser(asynchat.async_chat):
 
   def stack_usermentioned(self, msg):
     # Skip UserMentioned because UserMentioned events are always
-    # accompanied with a MessagePosted event with the same payload.
+    # accompanied by a MessagePosted event with the same payload.
     pass
 
   def stack_messageposted(self, msg):
@@ -286,22 +314,16 @@ class IRCUser(asynchat.async_chat):
         line)
 
   def stack_messageedited(self, msg):
-    # Note: MessageEdited comes with msg.content as the new content, and
-    # the same message_id as the message being edited.
-    # What we probably want to do here is keep an LRU of seen message IDs --
-    # perhaps 32 or so -- with their associated content, and when we get
-    # a MessageEdited, pull the previous version, compute the diff, show
-    # only the diff, and store the edited version.
-    # This would also let us drop repeat messages, which happen sometimes.
-    # Note: "id" is the ID of the message itself and is guaranteed unique
-    # (or rather, multiple messages with the same ID are guaranteed to be the
-    # same message). "message_id" is the ID of the message being edited.
-    # MessagePosted comes with separate message_id and message fields too
-    # also, sometimes there's a MessageEdited with no corresponding MessagePosted
-    self.to_irc(':%s PRIVMSG %s :%s',
-      tonick(msg.user.name),
-      tochannel(msg.room.name),
-      '*' + toplaintext(msg.content))
+    # msg.content is the new content, and msg.message_id is the ID of the
+    # message being edited.
+    if msg.data['message_id'] in self._msg_cache:
+      log("Cache hit! %s => %s" % (msg.data['message_id'], msg))
+      msg.content = '* ' + diffstr(
+        self._msg_cache[msg.data['message_id']].content,
+        msg.content, context=8)
+    else:
+      msg.content = '* ' + msg.content
+    self.stack_messageposted(self, msg)
 
   def stack_userentered(self, msg):
     if msg.user == self.stack.get_me():
