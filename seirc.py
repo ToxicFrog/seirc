@@ -16,7 +16,7 @@ import chatexchange.events
 
 from html.parser import HTMLParser
 from lrudict import LRUDict
-from libirc import IRCHandler
+from irc_handler import IRCHandler
 from util import *
 
 BIND_HOST = 'localhost'
