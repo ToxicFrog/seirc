@@ -1,5 +1,8 @@
 """Assorted utility functions that don't need any additional state."""
 
+import re
+import os
+
 def log(s):
   print(s)
 
