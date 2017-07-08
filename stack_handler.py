@@ -36,19 +36,9 @@ class StackHandler(object):
     # Same as UserMentioned.
     pass
 
-  def stack_messageposted(self, msg):
-    if msg.user == self.stack.get_me():
-      # Ignore self-messages
-      return
-    self._send_lines(
-      tonick(msg.user.name),
-      tochannel(msg.room.name),
-      toplaintext(msg.content).split('\n'))
-
   def _send_lines(self, src, dst, lines):
-    for line in lines:
-      line = line.strip(" \t\r\n")
-      if line == '':
+    for line in lines.split('\n'):
+      if line.strip(" \t\r\n") == '':
         continue
       if (line.startswith('*') and line.endswith('*')
           or line.startswith('\x1F') and line.endswith('\x1F')):
@@ -57,6 +47,15 @@ class StackHandler(object):
         src,
         dst,
         line)
+
+  def stack_messageposted(self, msg):
+    if msg.user == self.stack.get_me():
+      # Ignore self-messages
+      return
+    self._send_lines(
+      tonick(msg.user.name),
+      tochannel(msg.room.name),
+      toplaintext(msg.content))
 
   def stack_messageedited(self, msg):
     # msg.content is the new content, and msg.message_id is the ID of the
@@ -68,8 +67,8 @@ class StackHandler(object):
       new_txt = toplaintext(msg.content)
       text = '* ' + diffstr(old_txt, new_txt, context=8)
     else:
-      text = '* ' + toplaintext(msg.content)
-    self._send_lines(tonick(msg.user.name), tonick(msg.room.name), text)
+      text = ('* ' + toplaintext(msg.content))
+    self._send_lines(tonick(msg.user.name), tochannel(msg.room.name), text)
 
   def stack_userentered(self, msg):
     if msg.user == self.stack.get_me():
