@@ -16,9 +16,8 @@ import chatexchange.events
 
 from html.parser import HTMLParser
 from lrudict import LRUDict
-import libirc
+from libirc import IRCHandler,tonick,tochannel
 
-STACK_BACKEND = 'stackexchange.com'
 BIND_HOST = 'localhost'
 BIND_PORT = 7825
 
@@ -88,7 +87,7 @@ def diffstr(old, new, context=0):
 
 #### Server code ####
 
-class IRCUser(asynchat.async_chat):
+class IRCUser(asynchat.async_chat, IRCHandler):
   """Represents a single connected user.
 
   This class is responsible for handling incoming traffic from IRC, and either
@@ -98,13 +97,10 @@ class IRCUser(asynchat.async_chat):
   handlers = []
   def __init__(self, sock):
     asynchat.async_chat.__init__(self, sock=sock)
+    IRCHandler.__init__(self)
+
     self.recvq = []
-    self.channels = {}
     self.set_terminator(b'\r\n')
-    # IRC user state
-    self.username = None
-    self.password = None
-    self.nick = None
     self.stack = None
 
   def collect_incoming_data(self, data):
@@ -116,7 +112,7 @@ class IRCUser(asynchat.async_chat):
     self.recvq = []
 
     print('<<irc', msg)
-    if not libirc.dispatch(self, msg):
+    if not self.dispatch_irc(msg):
       # Unrecognized commands from IRC get ignored.
       print("Unknown command from IRC: %s" % msg)
 
@@ -138,20 +134,6 @@ class IRCUser(asynchat.async_chat):
   def to_irc(self, fmt, *args):
     print("irc>>", (fmt % tuple(args)))
     self.push((fmt % tuple(args) + '\r\n').encode('utf-8'))
-
-  def login(self):
-    print('Logging in to StackExchange as', self.username)
-    try:
-      self.stack = chatexchange.Client(STACK_BACKEND)
-      self.stack.login(self.username, self.password)
-      self.to_irc(':SEIRC 001 %s :Welcome to StackExchange IRC Relay', self.nick)
-      self.to_irc(':SEIRC 376 %s :End of MOTD', self.nick)
-    except Exception as e:
-      print('ERROR:', e)
-      self.stack = None
-      self.to_irc(':SEIRC 464 %s :Login to StackExchange failed: %s', self.nick, e)
-      self.to_irc(':%s QUIT', self.nick)
-      self.close_when_done()
 
   #### Handlers for messages from Stack ####
 
@@ -188,8 +170,8 @@ class IRCUser(asynchat.async_chat):
           or line.startswith('\x1F') and line.endswith('\x1F')):
         line = '\x01ACTION ' + line[1:-1] + '\x01'
       self.to_irc(':%s PRIVMSG %s :%s',
-        libirc.tonick(msg.user.name),
-        libirc.tochannel(msg.room.name),
+        tonick(msg.user.name),
+        tochannel(msg.room.name),
         line)
 
   def stack_messageedited(self, msg):
@@ -207,12 +189,12 @@ class IRCUser(asynchat.async_chat):
   def stack_userentered(self, msg):
     if msg.user == self.stack.get_me():
       return
-    self.to_irc(':%s JOIN %s', libirc.tonick(msg.user.name),
-      libirc.tochannel(msg.room.name))
+    self.to_irc(':%s JOIN %s', tonick(msg.user.name),
+      tochannel(msg.room.name))
 
   def stack_userleft(self, msg):
-    self.to_irc(':%s PART %s', libirc.tonick(msg.user.name),
-      libirc.tochannel(msg.room.name))
+    self.to_irc(':%s PART %s', tonick(msg.user.name),
+      tochannel(msg.room.name))
 
 
 class IRCServer(asyncore.dispatcher):
