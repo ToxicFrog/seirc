@@ -16,7 +16,8 @@ import chatexchange.events
 
 from html.parser import HTMLParser
 from lrudict import LRUDict
-from libirc import IRCHandler,tonick,tochannel
+from libirc import IRCHandler
+from util import *
 
 BIND_HOST = 'localhost'
 BIND_PORT = 7825
@@ -26,63 +27,6 @@ _parser = HTMLParser()
 # TODO: import chatexchange.browser and patch RoomPollingWatcher._runner()
 # and RoomSocketWatcher._runner() to catch and handle exceptions from the HTTP
 # layer.
-
-
-#### Utility functions ####
-
-def log(s):
-  print(s)
-
-
-# Convert HTML-bearing messages from Stack into plain text suitable for IRC.
-def toplaintext(text):
-  text = (text
-    .replace('<b>', '\x02')
-    .replace('</b>', '\x02')
-    .replace('<u>', '\x1F')
-    .replace('</u>', '\x1F')
-    .replace('<i>', '\x1F')
-    .replace('</i>', '\x1F')
-    .replace('<code>', '`')
-    .replace('</code>', '`')
-    )
-
-  # If we see the same link multiple times in a message, we only convert the
-  # first one for brevity's sake.
-  seen_links = set()
-
-  def fix_img(match):
-    return fix_link(match).replace('[', '[img ', 1)
-
-  def fix_link(match):
-    link = match.group(1)
-    if link in seen_links:
-      return ''
-    seen_links.add(link)
-    if link.startswith('//'):
-      return ' [http:' + link + '] '
-    if link.startswith('/'):
-      return ' [http://' + STACK_BACKEND + link + '] '
-    return ' [' + link + '] '
-
-  text = re.sub(r'\s*<img [^>]*src="([^"]+)"[^>]*>\s*', fix_img, text)
-  text = re.sub(r'\s*<a [^>]*href="([^"]+)"[^>]*>\s*', fix_link, text)
-  text = re.sub(r'(<[^>]+>)+', ' ', text)
-  return _parser.unescape(text)
-
-def diffstr(old, new, context=0):
-  """Return only the part of `new` that is different from `old`, by stripping
-  the common prefix and suffix (if any) from them."""
-  prefix = '…'
-  suffix = '…'
-  prefix_len = max(0, len(os.path.commonprefix([old, new])) - context)
-  suffix_len = -max(0, len(os.path.commonprefix([old[::-1], new[::-1]])) - context)
-  if prefix_len == 0:
-    prefix = ''
-  if suffix_len == 0:
-    suffix_len = None
-    suffix = ''
-  return prefix + new[prefix_len:suffix_len] + suffix
 
 
 #### Server code ####

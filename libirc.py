@@ -3,22 +3,9 @@
 import re
 import chatexchange.client
 
+from util import *
+
 STACK_BACKEND = 'stackexchange.com'
-
-#### Public utility functions. ####
-
-def tonick(user_name):
-  """Convert a Stack user name (with embedded unicode escapes and possibly
-  whitespace) into an IRC nick (with no whitespace and UTF-8 encoding).
-  """
-  return user_name.encode('utf8').decode('raw_unicode_escape').replace(' ', '')
-
-def tochannel(room_name):
-  """Convert a Stack room name into an idiomatic IRC channel name by downcasing
-  and replacing whitespace with hyphens.
-  """
-  return '#' + room_name.lower().replace(' ', '-')
-
 
 #### Event handlers. ####
 
