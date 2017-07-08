@@ -3,6 +3,10 @@
 import re
 import os
 
+from html.parser import HTMLParser
+
+_parser = HTMLParser()
+
 def log(s):
   print(s)
 

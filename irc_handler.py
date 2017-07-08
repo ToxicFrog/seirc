@@ -124,7 +124,7 @@ class IRCHandler(object):
       channel.irc_name = tochannel(channel.name)
       self.channels[chanid] = channel
       self.channels[channel.irc_name] = channel
-      channel.watch(lambda msg,stack: self._handle_stack(msg))
+      channel.watch(lambda msg,stack: self.dispatch_stack(msg))
       self.to_irc(':%s JOIN %s', self.nick, channel.irc_name)
       self._send_names(channel)
       self._send_modes(channel)
