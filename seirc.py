@@ -323,7 +323,7 @@ class IRCUser(asynchat.async_chat):
         msg.content, context=8)
     else:
       msg.content = '* ' + msg.content
-    self.stack_messageposted(self, msg)
+    self.stack_messageposted(msg)
 
   def stack_userentered(self, msg):
     if msg.user == self.stack.get_me():
