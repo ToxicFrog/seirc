@@ -246,8 +246,8 @@ class IRCUser(asynchat.async_chat):
       self.to_irc(':SEIRC 442 %s :You are not on that channel', channel)
       return
     channel = self.channels[channel]
-    del channels[channel.id]
-    del channels[channel.irc_name]
+    del self.channels[channel.id]
+    del self.channels[channel.irc_name]
     channel.leave()
 
   @irc(r'QUIT ?(.*)')
@@ -307,7 +307,7 @@ class IRCUser(asynchat.async_chat):
         continue
       if (line.startswith('*') and line.endswith('*')
           or line.startswith('\x1F') and line.endswith('\x1F')):
-        line = '\x01ACTION' + line[1:-1] + '\x01'
+        line = '\x01ACTION ' + line[1:-1] + '\x01'
       self.to_irc(':%s PRIVMSG %s :%s',
         tonick(msg.user.name),
         tochannel(msg.room.name),
