@@ -16,6 +16,7 @@ import chatexchange.events
 
 from html.parser import HTMLParser
 from lrudict import LRUDict
+import libirc
 
 STACK_BACKEND = 'stackexchange.com'
 BIND_HOST = 'localhost'
@@ -23,40 +24,16 @@ BIND_PORT = 7825
 
 _parser = HTMLParser()
 
+# TODO: import chatexchange.browser and patch RoomPollingWatcher._runner()
+# and RoomSocketWatcher._runner() to catch and handle exceptions from the HTTP
+# layer.
+
 
 #### Utility functions ####
-
-# Decorator to restrict which IRC messages a given handler fires on, and extract
-# arguments from it. TODO: replace this with a basic IRC parser and dispatch based
-# on method name in a manner similar to the Stack dispatcher.
-def irc(regex):
-  regex = re.compile(regex)
-  def decorator(f):
-    def wrapper(self, line):
-      match = regex.match(line)
-      if match:
-        f(self, *match.groups())
-        return True
-      else:
-        # The command appears to match, or we wouldn't have been called, but the
-        # regex doesn't match the actual content of the message.
-        # We should probably log an error here.
-        return False
-    return wrapper
-  return decorator
-
 
 def log(s):
   print(s)
 
-# Convert a Stack user name into an IRC nick
-def tonick(user_name):
-  return user_name.encode('utf8').decode('raw_unicode_escape').replace(' ', '')
-  #.encode('ascii', 'ignore')
-
-# Convert a Stack room name into an IRC channel name
-def tochannel(room_name):
-  return '#' + room_name.lower().replace(' ', '-')
 
 # Convert HTML-bearing messages from Stack into plain text suitable for IRC.
 def toplaintext(text):
@@ -136,14 +113,10 @@ class IRCUser(asynchat.async_chat):
   def found_terminator(self):
     """Called when we've read an entire line from IRC."""
     msg = ''.join(self.recvq)
-    print('<<irc', msg)
     self.recvq = []
-    command = msg.split(None, 1)[0]
-    handler = getattr(self, 'irc_' + command.lower(), None)
-    if handler:
-      if not handler(msg):
-        print("Command handler rejected regex for message: %s" % msg)
-    else:
+
+    print('<<irc', msg)
+    if not libirc.dispatch(self, msg):
       # Unrecognized commands from IRC get ignored.
       print("Unknown command from IRC: %s" % msg)
 
@@ -180,106 +153,6 @@ class IRCUser(asynchat.async_chat):
       self.to_irc(':%s QUIT', self.nick)
       self.close_when_done()
 
-  #### Handlers for messages coming from IRC ####
-
-  @irc(r'PING (.*)')
-  def irc_ping(self, ts):
-    self.to_irc(':SEIRC PONG SEIRC :%s', ts)
-
-  @irc(r'NICK (.*)')
-  def irc_nick(self, nick):
-    self.nick = nick
-    if self.nick and self.username and self.password:
-      self.login()
-
-  @irc(r'PASS (.*)')
-  def irc_pass(self, pwd):
-    self.password = pwd
-    if self.nick and self.username and self.password:
-      self.login()
-
-  @irc(r'USER \S+ \S+ \S+ :(\S+)')
-  def irc_user(self, username):
-    self.username = username
-    if self.nick and self.username and self.password:
-      self.login()
-
-  @irc(r'JOIN (\S+)')
-  def irc_join(self, chanid):
-    if ',' in chanid:
-      for channel in chanid.split(','):
-        self.irc_join("JOIN %s" % channel)
-      return
-    if chanid in self.channels:
-      return
-    if chanid.startswith('#'):
-      return
-    try:
-      channel = self.stack.get_room(chanid)
-      channel.join()
-      channel.irc_name = tochannel(channel.name)
-      self.channels[chanid] = channel
-      self.channels[channel.irc_name] = channel
-      channel.watch(lambda msg,stack: self._handle_stack(msg))
-      self.to_irc(':%s JOIN %s', self.nick, channel.irc_name)
-      self._send_names(channel)
-      self._send_modes(channel)
-    except Exception as e:
-      print('ERROR:', e)
-      self.to_irc(':SEIRC 403 %s :No channel with that ID.', chanid)
-
-  def _send_modes(self, channel):
-    self.to_irc(':SEIRC 324 %s %s +ntr', self.nick, channel.irc_name)
-
-  def _send_names(self, channel):
-    self.to_irc(':SEIRC 353 %s = %s :%s', self.nick, channel.irc_name,
-        ' '.join([tonick(user.name) for user in channel.get_current_users()]))
-    self.to_irc(':SEIRC 366 %s %s :end of NAMES', self.nick, channel.irc_name)
-
-  @irc(r'NAMES (\S+)')
-  def irc_names(self, channel):
-    if channel in self.channels:
-      self._send_names(self.channels[channel])
-
-  @irc(r'MODE (\S+)')
-  def irc_mode(self, channel):
-    if channel in self.channels:
-      self._send_modes(self.channels[channel])
-
-  @irc(r'PART (\S+)')
-  def irc_part(self, channel):
-    if not channel in self.channels:
-      self.to_irc(':SEIRC 442 %s :You are not on that channel', channel)
-      return
-    channel = self.channels[channel]
-    del self.channels[channel.id]
-    del self.channels[channel.irc_name]
-    channel.leave()
-
-  @irc(r'QUIT ?(.*)')
-  def irc_quit(self, reason):
-    print("Disconnecting.")
-    self.close_when_done()
-
-  @irc(r'PRIVMSG (.*) :(.*)')
-  def irc_privmsg(self, target, msg):
-    if not target in self.channels:
-      self.to_irc(':SEIRC 404 %s :You are not on that channel', self.nick)
-      return
-    # If the message starts with a run of non-whitespace followed by :,
-    # assume it's being directed at another user and replace the trailing :
-    # with a leading @ so that the stack webclient's hilight gets triggered.
-    msg = re.sub(r'^(\S+): ', r'@\1 ', msg)
-
-    # Translate IRC formatting characters to Slack ones.
-    msg = msg.replace('\x02', '*').replace('\x1F', '_')
-
-    # If the message is a CTCP ACTION, wrap it in * instead.
-    msg = re.sub('^\x01ACTION (.*)\x01$', r'*\1*', msg)
-
-    # Send it to Stack.
-    self.channels[target].send_message(msg)
-
   #### Handlers for messages from Stack ####
 
   _msg_cache = LRUDict(lru_size=256)
@@ -315,8 +188,8 @@ class IRCUser(asynchat.async_chat):
           or line.startswith('\x1F') and line.endswith('\x1F')):
         line = '\x01ACTION ' + line[1:-1] + '\x01'
       self.to_irc(':%s PRIVMSG %s :%s',
-        tonick(msg.user.name),
-        tochannel(msg.room.name),
+        libirc.tonick(msg.user.name),
+        libirc.tochannel(msg.room.name),
         line)
 
   def stack_messageedited(self, msg):
@@ -334,12 +207,12 @@ class IRCUser(asynchat.async_chat):
   def stack_userentered(self, msg):
     if msg.user == self.stack.get_me():
       return
-    self.to_irc(':%s JOIN %s', tonick(msg.user.name),
-      tochannel(msg.room.name))
+    self.to_irc(':%s JOIN %s', libirc.tonick(msg.user.name),
+      libirc.tochannel(msg.room.name))
 
   def stack_userleft(self, msg):
-    self.to_irc(':%s PART %s', tonick(msg.user.name),
-      tochannel(msg.room.name))
+    self.to_irc(':%s PART %s', libirc.tonick(msg.user.name),
+      libirc.tochannel(msg.room.name))
 
 
 class IRCServer(asyncore.dispatcher):
