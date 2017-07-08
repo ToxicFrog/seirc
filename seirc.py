@@ -95,7 +95,8 @@ class IRCUser(asynchat.async_chat, IRCHandler):
       else:
         print('Unrecognized message type from Stack: %s' % msgtype)
     except Exception as e:
-      print('!! Error handling message from Stack: %s' % str(e))
+      self.to_irc(':SEIRC NOTICE %s :Error processing message from Stack: %s',
+        self.nick, str(e))
 
   def stack_usermentioned(self, msg):
     # Skip UserMentioned because UserMentioned events are always
