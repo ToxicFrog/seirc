@@ -79,20 +79,32 @@ For example, to join Sandbox, you'd see that the URL is
 `http://chat.stackexchange.com/rooms/1/sandbox`, type `/join 1` in IRC, and
 find yourself in `#sandbox` on IRC a moment later.
 
+You can join multiple channels at once in the usual manner, e.g. `/join 1,35`.
+
+For some reason autojoin, at least on weechat, doesn't work properly with SEIRC;
+weechat never sends the JOIN command. Possibly it's waiting for a numeric that
+SEIRC doesn't send yet. Setting `/join` as the on-connect command, however, does
+work.
+
 ### Chatting
 
 - *Stack names* are translated into IRC-style nicks without whitespace.
-- *Edits* show up as the edited line, repeated, with a `*` in front
+- *Edits* display the changed part of the message, surrounded with some context
+  from the original message; if the original isn't available it just displays the
+  entire edited message. In either case the message is prefixed with '*'.
 - *@ hilights* work properly. Starting a line with `Name: ` (as is common with
   tab completion in most IRC clients) will automatically be translated to
   `@Name `.
-- *Links and inline images* are displayed wrapped in [].
+- *Links and inline images* are displayed wrapped in `[brackets]`.
 - *Multi-line messages* show up as multiple IRC messages.
+- *Replies* show up as normal @ highlights of the person being replied to, but
+  with the message proper prefixed with `[re: …]` where the `…` is the first few
+  words of the message being replied to.
 
 ## TODO
 
-- Edits should show only the diff, not the entire line
 - `*` and `_` render as italic in SE, but not in IRC
 - IRC formatting characters sometimes don't get passed to SE properly
 - Channel topic
-- Replies should include the timestamp of the message being replied to, if it's still in the cache
+- Support replies from inside IRC
+- Support configuration settings
