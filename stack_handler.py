@@ -63,7 +63,7 @@ class StackHandler(object):
     context = toplaintext(replied_to.content)
     if context.startswith('@'):
       [_,context] = context.split(None, 1)
-    context = ' [re: %s…] ' % context[0:16]
+    context = ' [re: %s%s] ' % (context[0:16], len(context) > 16 and '…' or '')
     self._send_lines(
       tonick(msg.user.name),
       tochannel(msg.room.name),
