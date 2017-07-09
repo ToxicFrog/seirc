@@ -74,7 +74,7 @@ class StackHandler(object):
     if msg.user == self.stack.get_me():
       # Ignore self-messages
       return
-    if msg.parent_message_id:
+    if msg.parent_message_id and msg.show_parent:
       # Message is a reply to an earlier message.
       if self._stack_show_reply(msg):
         return
