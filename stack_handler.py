@@ -48,10 +48,36 @@ class StackHandler(object):
         dst,
         line)
 
+  def _stack_show_reply(self, msg):
+    """Given an in-reply-to message, look up the message it's replying to and,
+    if found, insert some context into the message.
+
+    Returns True on success, False otherwise.
+    """
+    replied_to = self._msg_cache.get(msg.parent_message_id, None)
+    if not replied_to:
+      return False
+
+    # Splice some context in to the start of the message.
+    [head,tail] = msg.content.split(None, 1)
+    context = toplaintext(replied_to.content)
+    if context.startswith('@'):
+      [_,context] = context.split(None, 1)
+    context = ' [re: %s…] ' % context[0:16]
+    self._send_lines(
+      tonick(msg.user.name),
+      tochannel(msg.room.name),
+      head + context + toplaintext(tail))
+    return True
+
   def stack_messageposted(self, msg):
     if msg.user == self.stack.get_me():
       # Ignore self-messages
       return
+    if msg.parent_message_id:
+      # Message is a reply to an earlier message.
+      if self._stack_show_reply(msg):
+        return
     self._send_lines(
       tonick(msg.user.name),
       tochannel(msg.room.name),
