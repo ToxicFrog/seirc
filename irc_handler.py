@@ -5,8 +5,6 @@ import chatexchange.client
 
 from util import *
 
-STACK_BACKEND = 'stackexchange.com'
-
 #### Event handlers. ####
 
 class IRCHandler(object):

@@ -5,6 +5,8 @@ import os
 
 from html.parser import HTMLParser
 
+STACK_BACKEND = 'stackexchange.com'
+
 _parser = HTMLParser()
 
 def log(s):
