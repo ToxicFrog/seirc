@@ -9,14 +9,20 @@ STACK_BACKEND = 'stackexchange.com'
 
 _parser = HTMLParser()
 
-def log(s):
-  print(s)
+def log(*s):
+  print(*s)
 
 def tonick(user_name):
-  """Convert a Stack user name (with embedded unicode escapes and possibly
-  whitespace) into an IRC nick (with no whitespace and UTF-8 encoding).
+  """Convert a Stack user name into an IRC nick name by stripping whitespace.
+  Also roundtrips it through raw_unicode_escape to handle nicks in the user
+  list (which use embedded \\uXXXX sequences for non-ASCII characters). For
+  some reason nicks in MessagePosted events use the actual utf-8 characters,
+  which are unharmed by this.
   """
-  return user_name.encode('utf8').decode('raw_unicode_escape').replace(' ', '')
+  return (user_name
+    .encode('raw_unicode_escape')
+    .decode('raw_unicode_escape')
+    .replace(' ', ''))
 
 def tochannel(room_name):
   """Convert a Stack room name into an idiomatic IRC channel name by downcasing
@@ -30,8 +36,7 @@ def toplaintext(text):
     .replace('<b>', '\x02').replace('</b>', '\x02')
     .replace('<u>', '\x1F').replace('</u>', '\x1F')
     .replace('<i>', '\x1F').replace('</i>', '\x1F')
-    .replace('<code>', '`').replace('</code>', '`')
-    )
+    .replace('<code>', '`').replace('</code>', '`'))
 
   # If we see the same link multiple times in a message, we only convert the
   # first one for brevity's sake.
