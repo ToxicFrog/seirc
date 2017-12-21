@@ -19,8 +19,6 @@ class StackHandler(object):
       handler = getattr(self, 'stack_' + msgtype, None)
       if handler:
         handler(msg)
-        if 'message_id' in msg.data:
-          self._msg_cache[msg.data['message_id']] = msg
       else:
         print('Unrecognized message type from Stack: %s' % msgtype)
     except Exception as e:
@@ -54,25 +52,43 @@ class StackHandler(object):
 
     Returns True on success, False otherwise.
     """
+    log("Showing reply to %s" % str(msg))
+
+    # Don't have the message being replied to in cache? Bail. Caller will fall
+    # back to normal message display.
     replied_to = self._msg_cache.get(msg.parent_message_id, None)
     if not replied_to:
       return False
 
-    # Splice some context in to the start of the message.
-    [head,tail] = msg.content.split(None, 1)
-    context = toplaintext(replied_to.content)
+    # Strip @user from start of original context so we get actual message content.
+    context = replied_to.content
     if context.startswith('@'):
       [_,context] = context.split(None, 1)
-    context = ' [re: %s%s] ' % (context[0:16], len(context) > 16 and '…' or '')
+    context = toplaintext(context)
+
+    prefix = ''
+    if not msg.content.startswith('@'):
+      # Prefix the message with the name of the user being replied to.
+      prefix = '@' + replied_to.user.name
+
+    # TODO: configurable context length
+    # TODO: configure whether context goes at start or at end
+    suffix = ' [re: %s%s]' % (context[0:16], len(context) > 16 and '…' or '')
     self._send_lines(
       tonick(msg.user.name),
       tochannel(msg.room.name),
-      head + context + toplaintext(tail))
+      toplaintext(prefix + msg.content) + suffix)
+    self._msg_cache[msg.data['message_id']] = msg
     return True
 
   def stack_messageposted(self, msg):
     if msg.user == self.stack.get_me():
       # Ignore self-messages
+      return
+    if msg.data['message_id'] in self._msg_cache:
+      # We've already seen this message, and it's not an edit (or we would be in
+      # stack_messageedited right now instead). Skip.
+      log("Discarding message with duplicate id %d" % msg.data['message_id'])
       return
     if msg.parent_message_id and msg.show_parent:
       # Message is a reply to an earlier message.
@@ -82,6 +98,7 @@ class StackHandler(object):
       tonick(msg.user.name),
       tochannel(msg.room.name),
       toplaintext(msg.content))
+    self._msg_cache[msg.data['message_id']] = msg
 
   def stack_messageedited(self, msg):
     # msg.content is the new content, and msg.message_id is the ID of the
@@ -95,6 +112,7 @@ class StackHandler(object):
     else:
       text = ('* ' + toplaintext(msg.content))
     self._send_lines(tonick(msg.user.name), tochannel(msg.room.name), text)
+    self._msg_cache[msg.data['message_id']] = msg
 
   def stack_userentered(self, msg):
     if msg.user == self.stack.get_me():
