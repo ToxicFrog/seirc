@@ -138,7 +138,7 @@ class IRCHandler(object):
     if channel in self.channels:
       self._send_modes(self.channels[channel])
 
-  def irc_part(self, channel):
+  def irc_part(self, channel, reason):
     """Leave a channel. Accepts both IRC channel names and SE channel IDs."""
     if not channel in self.channels:
       self.to_irc(':SEIRC 442 %s :You are not on that channel', channel)
