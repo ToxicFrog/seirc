@@ -56,9 +56,14 @@ def toplaintext(text):
       return ' [http://' + STACK_BACKEND + link + '] '
     return ' [' + link + '] '
 
+  # Replace <img> and <a> tags with [img ...] and [...]
   text = re.sub(r'\s*<img [^>]*src="([^"]+)"[^>]*>\s*', fix_img, text)
   text = re.sub(r'\s*<a [^>]*href="([^"]+)"[^>]*>\s*', fix_link, text)
+  # Replace all other tags with whitespace
+  # TODO: deal with cases like '<foo> <bar>' turning into '   ' and not ' '
   text = re.sub(r'(<[^>]+>)+', ' ', text)
+  # Replace a leading "@user" reference with "user:"
+  text = re.sub(r'^@(\S+)', r'\1:', text)
   return _parser.unescape(text)
 
 def diffstr(old, new, context=0):
