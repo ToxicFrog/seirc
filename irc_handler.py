@@ -2,6 +2,7 @@
 
 import re
 import chatexchange.client
+import logging
 
 from util import *
 
@@ -84,7 +85,7 @@ class IRCHandler(object):
       self.to_irc(':SEIRC 001 %s :Welcome to StackExchange IRC Relay', self.nick)
       self.to_irc(':SEIRC 376 %s :End of MOTD', self.nick)
     except Exception as e:
-      print('ERROR:', e)
+      logging.exception("Error logging in")
       self.stack = None
       self.to_irc(':SEIRC 464 %s :Login to StackExchange failed: %s', self.nick, e)
       self.to_irc(':%s QUIT', self.nick)
@@ -127,8 +128,9 @@ class IRCHandler(object):
       self._send_names(channel)
       self._send_modes(channel)
     except Exception as e:
-      print('ERROR:', e)
+      logging.exception("Error joining channel")
       self.to_irc(':SEIRC 403 %s :No channel with that ID.', chanid)
+      raise
 
   def irc_names(self, channel):
     if channel in self.channels:
