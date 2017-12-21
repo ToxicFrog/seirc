@@ -8,6 +8,7 @@ import asynchat
 import asyncore
 import socket
 import sys
+import os
 
 import chatexchange.client
 import chatexchange.events
@@ -22,6 +23,26 @@ BIND_PORT = 7825
 # and RoomSocketWatcher._runner() to catch and handle exceptions from the HTTP
 # layer.
 
+#### HACK HACK HACK ####
+# Patch chatexchange.browser.Browser to turn unhandled exceptions into program
+# exit.
+# Really we should just disconnect the client or something here, but for now I
+# just want something that will cause the client to reconnect with a minimum
+# of fuss.
+from chatexchange.browser import Browser
+
+def exceptionToExit(fn):
+  def wrapped(*args, **kwargs):
+    try:
+      return fn(*args, **kwargs)
+    except Exception as e:
+      print("Unhandled exception: ", e)
+      print('Exiting...')
+      os._exit(1)
+  return wrapped
+
+Browser._request = exceptionToExit(Browser._request)
+print("Patched Browser.")
 
 #### Server code ####
 
@@ -93,6 +114,7 @@ class IRCServer(asyncore.dispatcher):
 
     def handle_close(self):
         self.close()
+
 
 listener = IRCServer(address=(BIND_HOST, BIND_PORT))
 print("Listening on", BIND_PORT)
