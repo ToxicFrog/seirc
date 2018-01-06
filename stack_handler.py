@@ -9,7 +9,11 @@ class StackHandler(object):
   """
 
   def __init__(self):
+    # Recent messages, used to generate the deltas for edits and the thumbnails
+    # for replies.
     self._msg_cache = LRUDict(lru_size=256)
+    # Messages from me, used for edits.
+    self._from_me = {}
     self.stack = None
 
   def dispatch_stack(self, msg):
@@ -83,8 +87,10 @@ class StackHandler(object):
 
   def stack_messageposted(self, msg):
     if msg.user == self.stack.get_me():
-      # Ignore self-messages
+      # Save this message so that we can edit it later.
+      self._from_me[tochannel(msg.room.name)] = msg.message
       return
+
     if msg.data['message_id'] in self._msg_cache:
       # We've already seen this message, and it's not an edit (or we would be in
       # stack_messageedited right now instead). Skip.
@@ -100,7 +106,21 @@ class StackHandler(object):
       toplaintext(msg.content))
     self._msg_cache[msg.data['message_id']] = msg
 
+  def _stack_editmessage(self, channel, find, replace):
+    log('Edit request: %s /%s/ => %s', channel, find, replace)
+    if channel not in self._from_me:
+      return
+
+    msg = self._from_me[channel]
+    text = toplaintext(msg.content)
+    new_text = re.sub(find, replace, text)
+    if new_text != text:
+      msg.edit(new_text)
+
   def stack_messageedited(self, msg):
+    if msg.user == self.stack.get_me():
+      return
+
     # msg.content is the new content, and msg.message_id is the ID of the
     # message being edited.
     old_msg = self._msg_cache.get(msg.data['message_id'], None)

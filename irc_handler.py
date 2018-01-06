@@ -166,6 +166,18 @@ class IRCHandler(object):
       self.to_irc(':SEIRC 404 %s :You are not on that channel', self.nick)
       return
 
+    # If the message consists entirely of s/foo/bar/, it's editing the last
+    # posted message.
+    replace = re.match(r'^s(.)(.*)\1(.*)\1$', msg)
+    if replace:
+      # FIXME: when we send a (non-edit) message, we should invalidate the
+      # previously saved message so we don't apply edits to the wrong thing.
+      # We should also record that we have an outbound message on the wire.
+      # When we send an edit message, if there is no valid editable message but
+      # there is an outbound message, we should save the edit and apply it once
+      # the outbound message round-trips.
+      return self._stack_editmessage(target, replace.group(2), replace.group(3))
+
     # If the message starts with a run of non-whitespace followed by :,
     # assume it's being directed at another user and replace the trailing :
     # with a leading @ so that the stack webclient's hilight gets triggered.
