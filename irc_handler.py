@@ -45,7 +45,7 @@ class IRCHandler(object):
     self.to_irc(':SEIRC PONG SEIRC :%s', ts)
 
   def irc_quit(self, reason):
-    print("Disconnecting.")
+    log("Disconnecting.")
     self.close_when_done()
 
 
@@ -78,7 +78,7 @@ class IRCHandler(object):
       self.to_irc(':SEIRC 462 :Already registered.')
 
   def stack_login(self, username, password):
-    print('Logging in to StackExchange as', username)
+    log('Logging in to StackExchange as "%s"', username)
     try:
       self.stack = chatexchange.Client(STACK_BACKEND)
       self.stack.login(username, password)
@@ -161,8 +161,8 @@ class IRCHandler(object):
     if not target in self.channels:
       # DEBUG: sometimes we end up still receiving events from a channel but not
       # in the channel according to IRC.
-      print("Not in channel: %s", target)
-      print(self.channels.keys())
+      log("Not in channel: %s", target)
+      log("%s", self.channels.keys())
       self.to_irc(':SEIRC 404 %s :You are not on that channel', self.nick)
       return
 

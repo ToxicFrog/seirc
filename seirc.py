@@ -2,7 +2,9 @@
 
 from __future__ import print_function
 
-print("Starting up...")
+from util import *
+
+log("Starting up...")
 
 import asynchat
 import asyncore
@@ -36,13 +38,13 @@ def exceptionToExit(fn):
     try:
       return fn(*args, **kwargs)
     except Exception as e:
-      print("Unhandled exception: ", e)
-      print('Exiting...')
+      log("Unhandled exception: %s", e)
+      log('Exiting...')
       os._exit(1)
   return wrapped
 
 Browser._request = exceptionToExit(Browser._request)
-print("Patched Browser.")
+log("Patched Browser.")
 
 #### Server code ####
 
@@ -70,10 +72,10 @@ class IRCUser(asynchat.async_chat, IRCHandler, StackHandler):
     msg = ''.join(self.recvq)
     self.recvq = []
 
-    print('<<irc', msg)
+    log('<<irc %s', msg)
     if not self.dispatch_irc(msg):
       # Unrecognized commands from IRC get ignored.
-      print("Unknown command from IRC: %s" % msg)
+      log("Unknown command from IRC: %s" % msg)
 
   def handle_close(self):
     if self.stack and self.stack.logged_in:
@@ -91,7 +93,7 @@ class IRCUser(asynchat.async_chat, IRCHandler, StackHandler):
     return asynchat.async_chat.handle_error(self)
 
   def to_irc(self, fmt, *args):
-    print("irc>>", (fmt % tuple(args)))
+    log("irc> %s", (fmt % tuple(args)))
     self.push((fmt % tuple(args) + '\r\n').encode('utf-8'))
 
 
@@ -109,7 +111,7 @@ class IRCServer(asyncore.dispatcher):
     def handle_accept(self):
         # Called when a client connects to our socket
         client_info = self.accept()
-        print("New connection from %s" % str(client_info))
+        log("New connection from %s" % str(client_info))
         IRCUser(sock=client_info[0])
 
     def handle_close(self):
@@ -117,5 +119,5 @@ class IRCServer(asyncore.dispatcher):
 
 
 listener = IRCServer(address=(BIND_HOST, BIND_PORT))
-print("Listening on", BIND_PORT)
+log("Listening on", BIND_PORT)
 asyncore.loop()

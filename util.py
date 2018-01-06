@@ -2,15 +2,19 @@
 
 import re
 import os
+import logging
 
 from html.parser import HTMLParser
 
 STACK_BACKEND = 'stackexchange.com'
 
 _parser = HTMLParser()
+_logger = logging.getLogger(None)
+_logger.setLevel(logging.INFO)
+logging.basicConfig()
 
 def log(*s):
-  print(*s)
+  _logger.info(*s)
 
 def tonick(user_name):
   """Convert a Stack user name into an IRC nick name by stripping whitespace.

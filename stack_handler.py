@@ -13,14 +13,14 @@ class StackHandler(object):
     self.stack = None
 
   def dispatch_stack(self, msg):
-    print('<<stack', msg)
+    log('<<stack %s', msg)
     try:
       msgtype = msg.__class__.__name__.lower()
       handler = getattr(self, 'stack_' + msgtype, None)
       if handler:
         handler(msg)
       else:
-        print('Unrecognized message type from Stack: %s' % msgtype)
+        log('Unrecognized message type from Stack: %s', msgtype)
     except Exception as e:
       self.to_irc(':SEIRC NOTICE %s :Error processing message from Stack: %s',
         self.nick, str(e))
@@ -52,7 +52,7 @@ class StackHandler(object):
 
     Returns True on success, False otherwise.
     """
-    log("Showing reply to %s" % str(msg))
+    log("Showing reply to %s", str(msg))
 
     # Don't have the message being replied to in cache? Bail. Caller will fall
     # back to normal message display.
@@ -88,7 +88,7 @@ class StackHandler(object):
     if msg.data['message_id'] in self._msg_cache:
       # We've already seen this message, and it's not an edit (or we would be in
       # stack_messageedited right now instead). Skip.
-      log("Discarding message with duplicate id %d" % msg.data['message_id'])
+      log("Discarding message with duplicate id %d", msg.data['message_id'])
       return
     if msg.parent_message_id and msg.show_parent:
       # Message is a reply to an earlier message.
@@ -105,7 +105,7 @@ class StackHandler(object):
     # message being edited.
     old_msg = self._msg_cache.get(msg.data['message_id'], None)
     if old_msg:
-      log("Cache hit! %s => %s" % (msg.data['message_id'], old_msg))
+      log("Cache hit! %s => %s", msg.data['message_id'], old_msg)
       old_txt = toplaintext(old_msg.content)
       new_txt = toplaintext(msg.content)
       text = '* ' + diffstr(old_txt, new_txt, context=8)
