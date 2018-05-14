@@ -119,5 +119,5 @@ class IRCServer(asyncore.dispatcher):
 
 
 listener = IRCServer(address=(BIND_HOST, BIND_PORT))
-log("Listening on", BIND_PORT)
+log("Listening on %d", BIND_PORT)
 asyncore.loop()

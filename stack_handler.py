@@ -68,7 +68,7 @@ class StackHandler(object):
     context = replied_to.content
     if context.startswith('@'):
       [_,context] = context.split(None, 1)
-    context = toplaintext(context)
+    context = toplaintext(context, strip_tags=True)
 
     prefix = ''
     if not msg.content.startswith('@'):

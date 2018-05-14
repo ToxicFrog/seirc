@@ -34,12 +34,13 @@ def tochannel(room_name):
   """
   return '#' + room_name.lower().replace(' ', '-')
 
-def toplaintext(text):
+def toplaintext(text, strip_tags=False):
   """Convert an HTML message from Stack into a plain text message for IRC."""
   text = (text
     .replace('<b>', '\x02').replace('</b>', '\x02')
     .replace('<u>', '\x1F').replace('</u>', '\x1F')
     .replace('<i>', '\x1F').replace('</i>', '\x1F')
+    .replace('<s>', '{').replace('</s>', '}\x02^W\x02')
     .replace('<code>', '`').replace('</code>', '`'))
 
   # If we see the same link multiple times in a message, we only convert the
@@ -60,14 +61,17 @@ def toplaintext(text):
       return ' [http://' + STACK_BACKEND + link + '] '
     return ' [' + link + '] '
 
-  # Replace <img> and <a> tags with [img ...] and [...]
-  text = re.sub(r'\s*<img [^>]*src="([^"]+)"[^>]*>\s*', fix_img, text)
-  text = re.sub(r'\s*<a [^>]*href="([^"]+)"[^>]*>\s*', fix_link, text)
-  # Replace all other tags with whitespace
-  # TODO: deal with cases like '<foo> <bar>' turning into '   ' and not ' '
-  text = re.sub(r'(<[^>]+>)+', ' ', text)
-  # Replace a leading "@user" reference with "user:"
-  text = re.sub(r'^@(\S+)', r'\1:', text)
+  if strip_tags:
+    text = re.sub(r'\s*<[^>]+>', '', text)
+  else:
+    # Replace <img> and <a> tags with [img ...] and [...]
+    text = re.sub(r'\s*<img [^>]*src="([^"]+)"[^>]*>\s*', fix_img, text)
+    text = re.sub(r'\s*<a [^>]*href="([^"]+)"[^>]*>\s*', fix_link, text)
+    # Replace all other tags with whitespace
+    # TODO: deal with cases like '<foo> <bar>' turning into '   ' and not ' '
+    text = re.sub(r'(<[^>]+>)+', ' ', text)
+    # Replace a leading "@user" reference with "user:"
+    text = re.sub(r'^@(\S+)', r'\1:', text)
   return _parser.unescape(text)
 
 def diffstr(old, new, context=0):
