@@ -114,6 +114,8 @@ class IRCHandler(object):
       for channel in chanid.split(','):
         self.irc_join(channel)
       return
+    if chanid.startswith('#') and chanid[1:].isdecimal():
+        chanid = chanid[1:]
     if chanid in self.channels or chanid.startswith('#'):
       return
 
