@@ -186,7 +186,9 @@ class IRCHandler(object):
       msg = re.sub(r'^(\S+): ', r'@\1 ', msg)
 
     # Translate IRC formatting characters to Slack ones.
-    msg = msg.replace('\x02', '*').replace('\x1F', '_')
+    msg = (msg.replace('\x02', '**') # bold
+              .replace('\x1F', '_')  # underline -- not supported on stack, map to italics
+              .replace('\x1D', '*'))  # italics
 
     # If the message is a CTCP ACTION, wrap it in * instead.
     msg = re.sub('^\x01ACTION (.*)\x01$', r'*\1*', msg)
